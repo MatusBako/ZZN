@@ -1,3 +1,4 @@
+set -e 
 cd ~
 
 if [ ! -d ~/env ]; then
@@ -7,5 +8,7 @@ fi
 cd env
 virtualenv -p python3 zzn
 
+source zzn/bin/activate
+
 pip3 install --upgrade pip
-pip3 install numpy pandas scikit-learn==0.20rc1
+pip3 install -r requirements.txt

@@ -1,51 +1,69 @@
+#!/usr/bin/env python3
+
+from h2o.estimators.gbm import H2OGradientBoostingEstimator
+from h2o.estimators.random_forest import H2ORandomForestEstimator
+
 import numpy as np
 import pandas as pd
+from pandas.core.frame import DataFrame
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
-def load_data(path):
-	return pd.read_csv(path)
+from user_processing import get_users
+from place_processing import get_places
 
+import h2o
+import pandas as pd
 
-def preprocessing(df):
-	# remove '?' values
-	for column in df.columns:
-		if df[column].dtype.name == 'object':
-			df = df[df[column] != '?']
+# from mlxtend.preprocessing import TransactionEncoder
+# from mlxtend.frequent_patterns import apriori
 
-	# map strings to IDs
-	from sklearn import preprocessing
+from scipy.stats import zscore
 
-	nominal_columns = [column for column in df.columns if df[column].dtype.name == 'object']
-	replace_maps = {}
+from matplotlib import pyplot as plt
 
-	for column in nominal_columns:
-		le = preprocessing.LabelEncoder()
-		le.fit(df[column])
-		replace_map = dict(zip(le.classes_, le.transform(le.classes_)))
-		replace_maps[column] = replace_map
+pd.set_option('display.max_columns', 200)
 
-	return df.replace(replace_maps), replace_maps
+def heatmap():
+    df = get_users()
+    df_ratings = pd.read_csv("data/rating_final.csv")
 
+    # get place with most ratings
+    place_id = df_ratings.placeID.value_counts().idxmax()
 
-def main():
-	pd.set_option('display.max_columns', 50)
+    # filter ratings of given place
+    df_ratings = df_ratings[df_ratings.placeID == place_id]
 
-	df = load_data("data/userprofile.csv")
-	df, value_maps = preprocessing(df)
+    # join user profile with rating on user ID
+    df = df.merge(df_ratings[['userID', 'rating']], how='inner', on='userID')
 
-	X = df[['ambience', 'religion', 'drink_level', 'personality']]
-	Y = df.smoker
+    columns = ['birth_year', 'weight', 'height', 'rating']
+    data = np.array(df[columns].corr()).round(2)
 
-	xtrain, xtest, ytrain, ytest = train_test_split(X, Y, random_state=42)
+    ax = plt.gca()
+    im = ax.imshow(data, cmap='RdBu')  # Create colorbar
+    im.set_clim(-1, 1)
+    cbar = ax.figure.colorbar(im, ax=ax, )
 
-	clf = RandomForestClassifier(random_state=0)
-	clf.fit(xtrain, ytrain)
+    ax.set_xticks(np.arange(len(columns)))
+    ax.set_yticks(np.arange(len(columns)))
+    ax.set_xticklabels(columns)
+    ax.set_yticklabels(columns)
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+             rotation_mode="anchor")
 
-	predictions = clf.predict(xtest)
-	errors = abs(predictions - ytest)
-	print('Mean Absolute Error:', round(np.mean(errors), 2), 'degrees.')
-	#print(list((xtest, predictions, ytest))[:10])
+    # give text to each point in map
+    for i in range(len(columns)):
+        for j in range(len(columns)):
+            ax.text(j, i, data[i, j], ha="center", va="center", color=("w" if i == j else "k"))
+
+    plt.tight_layout()
+    #plt.show()
+    plt.savefig("heatmap.png")
+    # TODO: save plot
+
 
 if __name__ == "__main__":
-	main()
+    #train_h2o()
+    heatmap()
+    pass
